@@ -38,7 +38,7 @@ public sealed class TestRig : IAsyncLifetime
     private readonly RedisContainer redis = new RedisBuilder("redis:8-alpine").Build();
     // 3.9 rather than the 4.x the compose stack runs: Testcontainers writes advertised.listeners with a
     // trailing comma, which Kafka 4 rejects at startup. The client protocol is the same for both.
-    private readonly KafkaContainer kafka = new KafkaBuilder("apache/kafka:3.9.2").Build();
+    public KafkaContainer Kafka { get; } = new KafkaBuilder("apache/kafka:3.9.2").Build();
 
     public ClickHouseContainer ClickHouseContainer { get; } = new ClickHouseBuilder("clickhouse/clickhouse-server:26.8-alpine").Build();
 
@@ -54,14 +54,14 @@ public sealed class TestRig : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        await Task.WhenAll(postgres.StartAsync(), redis.StartAsync(), kafka.StartAsync(), ClickHouseContainer.StartAsync());
+        await Task.WhenAll(postgres.StartAsync(), redis.StartAsync(), Kafka.StartAsync(), ClickHouseContainer.StartAsync());
 
         Settings = new Dictionary<string, string?>
         {
             ["ConnectionStrings:Postgres"] = postgres.GetConnectionString(),
             ["ConnectionStrings:Redis"] = redis.GetConnectionString(),
             ["ConnectionStrings:ClickHouse"] = ClickHouseContainer.GetConnectionString(),
-            ["ConnectionStrings:Kafka"] = new Uri(kafka.GetBootstrapAddress()).Authority,
+            ["ConnectionStrings:Kafka"] = new Uri(Kafka.GetBootstrapAddress()).Authority,
             ["Tallyhouse:OperatorToken"] = OperatorToken,
             ["Tallyhouse:Kafka:DeliveryTimeout"] = "00:00:05",
             ["Tallyhouse:Loader:MaxBatchDelay"] = "00:00:00.200",
@@ -107,7 +107,7 @@ public sealed class TestRig : IAsyncLifetime
         await Task.WhenAll(
             postgres.DisposeAsync().AsTask(),
             redis.DisposeAsync().AsTask(),
-            kafka.DisposeAsync().AsTask(),
+            Kafka.DisposeAsync().AsTask(),
             ClickHouseContainer.DisposeAsync().AsTask());
     }
 

@@ -4,6 +4,7 @@ using System.Text.Json;
 using ClickHouse.Driver.ADO.Parameters;
 using ClickHouse.Driver.ADO.Readers;
 using ClickHouse.Driver.Utility;
+using Tallyhouse.Kernel.Ingestion;
 
 namespace Tallyhouse.IntegrationTests;
 
@@ -164,6 +165,46 @@ public sealed class IngestTests(TestRig rig)
 
         segment.GetProperty("lateEvents").GetInt64().ShouldBe(1);
         segment.GetProperty("days").EnumerateArray().Sum(day => day.GetProperty("events").GetInt64()).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_sampled_event_type_keeps_whole_users_and_queries_scale_them_back()
+    {
+        TestProject project = await rig.NewProjectAsync(new { redactProperties = Array.Empty<string>(), sampleRates = new Dictionary<string, double> { ["page_view"] = 0.1 } });
+        using HttpClient writer = rig.Client(project.WriteKey);
+        using HttpClient reader = rig.Client(project.ReadKey);
+        DateTimeOffset now = Now;
+        string[] users = [.. Enumerable.Range(0, 2000).Select(i => $"visitor-{i}")];
+
+        int sampledOut = 0;
+
+        foreach (string[] chunk in users.Chunk(250))
+        {
+            // Two page views per user: a kept user must be kept for both, a dropped user for neither.
+            JsonElement response = await Events.SendAsync(writer, [.. chunk.SelectMany(user => new[]
+            {
+                Events.Of("page_view", user, now.AddMinutes(-2)),
+                Events.Of("page_view", user, now.AddMinutes(-1)),
+            })]);
+
+            sampledOut += response.GetProperty("sampledOut").GetInt32();
+        }
+
+        int kept = users.Count(user => Sampling.Keeps(Sampling.BucketOf(UserIdentity.KeyOf(user, null)), Sampling.ThresholdOf(0.1)));
+        sampledOut.ShouldBe((users.Length - kept) * 2);
+
+        await rig.WaitForEventsAsync(project.Id, kept * 2);
+        (await rig.CountAsync(project.Id, "1")).ShouldBe(kept * 2, "no user is split between kept and dropped");
+
+        DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
+        HttpResponseMessage segment = await reader.PostAsJsonAsync("/v1/queries/segment", new { @event = "page_view", from = today.AddDays(-1), to = today }, TestRig.Json);
+        JsonElement result = await segment.Content.ReadFromJsonAsync<JsonElement>(TestRig.Json);
+
+        result.GetProperty("sampling").GetProperty("threshold").GetInt32().ShouldBe(1000);
+        result.GetProperty("days").EnumerateArray().Sum(day => day.GetProperty("events").GetInt64()).ShouldBe(kept * 2 * 10);
+        long estimatedUsers = result.GetProperty("days").EnumerateArray().Sum(day => day.GetProperty("users").GetInt64());
+        estimatedUsers.ShouldBe(kept * 10);
+        ((double)estimatedUsers / users.Length).ShouldBe(1.0, 0.2, "an estimate from a 10% sample of 2,000 users");
     }
 
     [Fact]
