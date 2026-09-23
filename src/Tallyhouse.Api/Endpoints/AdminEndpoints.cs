@@ -19,23 +19,49 @@ internal static class AdminEndpoints
     {
         RouteGroupBuilder operatorGroup = app.MapGroup("/v1/projects").RequireOperator().WithTags("Operator");
 
-        operatorGroup.MapPost("/", (Delegate)CreateProjectAsync);
-        operatorGroup.MapPut("/{projectId:guid}/settings", (Delegate)UpdateSettingsAsync);
-        operatorGroup.MapPut("/{projectId:guid}/schemas/{eventName}/versions/{version:int}", (Delegate)PutSchemaAsync);
-        operatorGroup.MapPost("/{projectId:guid}/quarantine/{quarantineId:guid}/replay", (Delegate)ReplayAsync);
+        operatorGroup.MapPost("/", (Delegate)CreateProjectAsync)
+            .WithName("CreateProject")
+            .Produces<CreateProjectResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem();
+
+        operatorGroup.MapPut("/{projectId:guid}/settings", (Delegate)UpdateSettingsAsync)
+            .WithName("UpdateProjectSettings")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        operatorGroup.MapPut("/{projectId:guid}/schemas/{eventName}/versions/{version:int}", (Delegate)PutSchemaAsync)
+            .WithName("PutSchema")
+            .Produces<PutSchemaResponse>(StatusCodes.Status200OK)
+            .Produces<PutSchemaResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        operatorGroup.MapPost("/{projectId:guid}/quarantine/{quarantineId:guid}/replay", (Delegate)ReplayAsync)
+            .WithName("ReplayQuarantined")
+            .Produces<ReplayResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         RouteGroupBuilder readGroup = app.MapGroup("/v1").RequireReadKey().WithTags("Catalog");
 
         readGroup.MapGet("/schemas", (HttpContext http, CatalogCache cache) =>
             Results.Json<IReadOnlyList<SchemaResponse>>(
                 [.. cache.Current.SchemasOf(http.Project().Id).Select(schema => new SchemaResponse(schema.EventName, schema.Version, schema.Spec))],
-                ApiJson.Default.IReadOnlyListSchemaResponse));
+                ApiJson.Default.IReadOnlyListSchemaResponse))
+            .WithName("ListSchemas")
+            .Produces<IReadOnlyList<SchemaResponse>>();
 
         readGroup.MapGet("/quarantine", async (HttpContext http, QuarantineStore quarantine, int? limit, string? cursor, CancellationToken cancellationToken) =>
         {
             QuarantinePage page = await quarantine.ListOpenAsync(http.Project().Id, limit ?? 50, cursor, cancellationToken);
             return Results.Json(QuarantinePageResponse.From(page), ApiJson.Default.QuarantinePageResponse);
-        });
+        })
+            .WithName("ListQuarantine")
+            .Produces<QuarantinePageResponse>();
     }
 
     private static async Task<IResult> CreateProjectAsync(CreateProjectRequest request, CatalogService catalog, CatalogRefresher refresher, CancellationToken cancellationToken)

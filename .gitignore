@@ -37,3 +37,6 @@ BenchmarkDotNet.Artifacts/
 .claude/
 graphify-out/
 .remember/
+
+# Written by the load harness: the benchmark project and its keys, local to one machine.
+.bench-project.json

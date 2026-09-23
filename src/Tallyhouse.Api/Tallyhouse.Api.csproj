@@ -1,11 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <!--
+    The OpenAPI document the dashboard's types are generated from. Written at build time when asked
+    (-p:OpenApiGenerateDocuments=true), and CI regenerates it and fails on any difference from the committed
+    copy, so a renamed field breaks the frontend type-check instead of the browser.
+  -->
+  <PropertyGroup>
+    <OpenApiGenerateDocuments>false</OpenApiGenerateDocuments>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/../../web</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name openapi</OpenApiGenerateDocumentsOptions>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Tallyhouse.Infrastructure\Tallyhouse.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
   </ItemGroup>
 
   <ItemGroup>

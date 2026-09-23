@@ -13,7 +13,13 @@ public static class QueryLimits
 {
     public const int MaxRangeDays = 366;
     public const int MaxFunnelSteps = 8;
-    public const int MaxRetentionDays = 90;
+
+    /// <summary>A user's returns are one 64-bit mask counted from their first day, so at most 63 days follow it.</summary>
+    public const int MaxRetentionDays = 63;
+
+    /// <summary>First cohort to last day followed. The per-user day masks are 256 bits wide.</summary>
+    public const int MaxRetentionSpanDays = 256;
+
     public const int MaxFilters = 10;
     public const int MaxFilterValues = 100;
     public static readonly TimeSpan MaxFunnelWindow = TimeSpan.FromDays(90);
@@ -99,6 +105,10 @@ public sealed record RetentionQuery(string StartEvent, string ReturnEvent, DateO
         if (Days is < 1 or > QueryLimits.MaxRetentionDays)
         {
             problems.Add($"days must be between 1 and {QueryLimits.MaxRetentionDays}");
+        }
+        else if (To >= From && To.DayNumber - From.DayNumber + Days >= QueryLimits.MaxRetentionSpanDays)
+        {
+            problems.Add($"from the first cohort to the last day followed may span at most {QueryLimits.MaxRetentionSpanDays} days");
         }
 
         return problems;

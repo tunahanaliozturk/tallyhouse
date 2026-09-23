@@ -29,6 +29,16 @@ public sealed class AnalyticsQueries(ClickHouseClient client)
 
     private static readonly QueryOptions Bounded = new() { MaxExecutionTime = TimeSpan.FromSeconds(30) };
 
+    // ClickHouse does not move filters into PREWHERE under FINAL by default, because that is only correct when
+    // the filtered columns are identical across the versions FINAL chooses between. Here they are: two copies
+    // of an event differ at most in when they arrived, never in what the event says. Measured on the benchmark
+    // dataset, the property filter then reads a fraction of the rows it would otherwise.
+    private static readonly QueryOptions BoundedFinal = new()
+    {
+        MaxExecutionTime = TimeSpan.FromSeconds(30),
+        CustomSettings = new Dictionary<string, object> { ["optimize_move_to_prewhere_if_final"] = 1 },
+    };
+
     private readonly ConcurrentDictionary<int, string> funnelSql = new();
 
     public async Task<FunnelResult> FunnelAsync(Guid projectId, FunnelQuery query, CancellationToken cancellationToken)
@@ -45,8 +55,8 @@ public sealed class AnalyticsQueries(ClickHouseClient client)
         parameters.AddParameter("project", projectId);
         parameters.AddParameter("steps", query.Steps.ToArray());
         parameters.AddParameter("from", from);
+        parameters.AddParameter("to", to);
         parameters.AddParameter("scanTo", to + window);
-        parameters.AddParameter("toMs", (ulong)new DateTimeOffset(to).ToUnixTimeMilliseconds());
         parameters.AddParameter("windowMs", (ulong)window.TotalMilliseconds);
         parameters.AddParameter("threshold", sampling.Threshold);
 
@@ -102,7 +112,6 @@ public sealed class AnalyticsQueries(ClickHouseClient client)
         parameters.AddParameter("to", query.To);
         parameters.AddParameter("lastReturnDay", lastReturnDay);
         parameters.AddParameter("fromTs", StartOf(query.From));
-        parameters.AddParameter("toTs", StartOf(query.To.AddDays(1)));
         parameters.AddParameter("lastReturnTs", StartOf(lastReturnDay.AddDays(1)));
         parameters.AddParameter("days", (ushort)query.Days);
         parameters.AddParameter("threshold", sampling.Threshold);
@@ -169,7 +178,7 @@ public sealed class AnalyticsQueries(ClickHouseClient client)
         long late = 0;
 
         using (Timed("segment"))
-        using (ClickHouseDataReader reader = await client.ExecuteReaderAsync(sql, parameters, Bounded, cancellationToken))
+        using (ClickHouseDataReader reader = await client.ExecuteReaderAsync(sql, parameters, BoundedFinal, cancellationToken))
         {
             while (reader.Read())
             {
@@ -232,15 +241,16 @@ public sealed class AnalyticsQueries(ClickHouseClient client)
     }
 
     /// <summary>
-    /// The smallest sampling threshold among the events a query touches, read from the rollup, which is
-    /// orders of magnitude smaller than the fact table. It reflects what was stored, not today's settings,
-    /// so a rate changed last week still scales last month correctly.
+    /// The smallest sampling threshold among the events a query touches, read from the monthly rollup, which is
+    /// a tenth the size of the fact table. It reflects what was stored, not today's settings, so a rate changed
+    /// last week still scales last month correctly. Whole months are read, so the answer can be more cautious
+    /// than the exact range needs, never less.
     /// </summary>
     private async Task<Sampled> SamplingForAsync(Guid projectId, IReadOnlyList<string>? events, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
         ClickHouseParameterCollection parameters = new();
         parameters.AddParameter("project", projectId);
-        parameters.AddParameter("from", from);
+        parameters.AddParameter("from", new DateOnly(from.Year, from.Month, 1));
         parameters.AddParameter("to", to);
 
         string filter = string.Empty;
@@ -252,7 +262,7 @@ public sealed class AnalyticsQueries(ClickHouseClient client)
         }
 
         object? threshold = await client.ExecuteScalarAsync(
-            $"SELECT min(sample_threshold) FROM user_event_days WHERE project_id = {{project:UUID}} AND day >= {{from:Date}} AND day <= {{to:Date}}{filter}",
+            $"SELECT min(sample_threshold) FROM user_event_months WHERE project_id = {{project:UUID}} AND month >= {{from:Date}} AND month <= {{to:Date}}{filter}",
             parameters,
             Bounded,
             cancellationToken);
@@ -312,55 +322,62 @@ public sealed class AnalyticsQueries(ClickHouseClient client)
             Duration.Record(System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalSeconds, new KeyValuePair<string, object?>("kind", kind));
     }
 
-    // A user belongs to the cohort of the first day in the range they did the start event, so every user is
-    // counted in exactly one cohort. The return days are collected per user once and tested with has(),
-    // which keeps this to a single join however many days are asked for.
+    // Retention is computed from one bitmask per user. Bit i of `starts` means the user did the start event on
+    // day from + i, bit i of `returns` the same for the return event. A user's cohort is their lowest start
+    // bit; shifting `returns` right by it gives a mask where bit k means "came back k days later", which fits
+    // one UInt64 because a query follows at most 63 days. There is no join and no per-user array of days.
+    //
+    // Both masks are ORs, so a duplicate event or a rollup row that has not been merged yet sets a bit that is
+    // already set, and the answer does not change.
     private const string RetentionTemplate = """
         SELECT
-            start_day,
+            {from:Date} + first AS start_day,
             count() AS users,
-            sumForEach(arrayMap(k -> toUInt64(has(return_days, start_day + k)), range(toUInt16({days:UInt16}) + 1))) AS retained
+            sumForEach(arrayMap(k -> bitAnd(bitShiftRight(later, k), 1), range(toUInt16({days:UInt16}) + 1))) AS retained
         FROM
         (
-            SELECT user_key, min(day) AS start_day
-            FROM ({START_ROWS})
-            GROUP BY user_key
-        ) AS cohort
-        LEFT JOIN
-        (
-            SELECT user_key, groupUniqArray(day) AS return_days
-            FROM ({RETURN_ROWS})
-            GROUP BY user_key
-        ) AS returns USING (user_key)
-        GROUP BY start_day
-        ORDER BY start_day
+            SELECT
+                toUInt16(bitPositionsToArray(starts)[1]) AS first,
+                toUInt64(bitAnd(bitShiftRight(returns, first), toUInt256(18446744073709551615))) AS later
+            FROM
+            (
+                {USERS}
+            )
+        )
+        GROUP BY first
+        ORDER BY first
         """;
 
-    private static readonly string RetentionFromRollup = RetentionTemplate
-        .Replace("{START_ROWS}", """
-            SELECT user_key, day FROM user_event_days
-            WHERE project_id = {project:UUID} AND event_name = {start:String}
-              AND day >= {from:Date} AND day <= {to:Date}
-              AND sample_bucket < {threshold:UInt16}
-            """, StringComparison.Ordinal)
-        .Replace("{RETURN_ROWS}", """
-            SELECT user_key, day FROM user_event_days
-            WHERE project_id = {project:UUID} AND event_name = {return:String}
-              AND day >= {from:Date} AND day <= {lastReturnDay:Date}
-              AND sample_bucket < {threshold:UInt16}
-            """, StringComparison.Ordinal);
+    // A month's 32-bit day mask, moved into the query's frame: bit i is day from + i.
+    private const string MonthInFrame =
+        "if(month >= {from:Date}, bitShiftLeft(toUInt256(days), toUInt16(month - {from:Date})), bitShiftRight(toUInt256(days), toUInt16({from:Date} - month)))";
 
-    private static readonly string RetentionFromEvents = RetentionTemplate
-        .Replace("{START_ROWS}", """
-            SELECT user_key, toDate(ts) AS day FROM events
-            WHERE project_id = {project:UUID} AND event_name = {start:String}
-              AND ts >= {fromTs:DateTime64(3, 'UTC')} AND ts < {toTs:DateTime64(3, 'UTC')}
-              AND NOT is_late AND sample_bucket < {threshold:UInt16}
-            """, StringComparison.Ordinal)
-        .Replace("{RETURN_ROWS}", """
-            SELECT user_key, toDate(ts) AS day FROM events
-            WHERE project_id = {project:UUID} AND event_name = {return:String}
-              AND ts >= {fromTs:DateTime64(3, 'UTC')} AND ts < {lastReturnTs:DateTime64(3, 'UTC')}
-              AND NOT is_late AND sample_bucket < {threshold:UInt16}
-            """, StringComparison.Ordinal);
+    private static readonly string RetentionFromRollup = RetentionTemplate.Replace("{USERS}", $$"""
+        SELECT
+            user_key,
+            groupBitOrIf(bitAnd({{MonthInFrame}}, bitShiftLeft(toUInt256(1), toUInt16({to:Date} - {from:Date}) + 1) - 1), event_name = {start:String}) AS starts,
+            groupBitOrIf({{MonthInFrame}}, event_name = {return:String}) AS returns
+        FROM user_event_months
+        WHERE project_id = {project:UUID}
+          AND event_name IN ({start:String}, {return:String})
+          AND month >= toStartOfMonth({from:Date}) AND month <= {lastReturnDay:Date}
+          AND sample_bucket < {threshold:UInt16}
+        GROUP BY user_key
+        HAVING starts != 0
+        """, StringComparison.Ordinal);
+
+    private static readonly string RetentionFromEvents = RetentionTemplate.Replace("{USERS}", """
+        SELECT
+            user_key,
+            groupBitOrIf(bitShiftLeft(toUInt256(1), toUInt16(toDate(ts) - {from:Date})), event_name = {start:String} AND toDate(ts) <= {to:Date}) AS starts,
+            groupBitOrIf(bitShiftLeft(toUInt256(1), toUInt16(toDate(ts) - {from:Date})), event_name = {return:String}) AS returns
+        FROM events
+        WHERE project_id = {project:UUID}
+          AND event_name IN ({start:String}, {return:String})
+          AND ts >= {fromTs:DateTime64(3, 'UTC')} AND ts < {lastReturnTs:DateTime64(3, 'UTC')}
+          AND NOT is_late
+          AND sample_bucket < {threshold:UInt16}
+        GROUP BY user_key
+        HAVING starts != 0
+        """, StringComparison.Ordinal);
 }

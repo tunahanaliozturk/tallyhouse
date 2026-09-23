@@ -13,22 +13,34 @@ internal static class QueryEndpoints
         group.MapPost("/funnel", async (FunnelQuery query, HttpContext http, AnalyticsQueries queries, CancellationToken cancellationToken) =>
             query.Problems() is { Count: > 0 } problems
                 ? Invalid(problems)
-                : Results.Json(await queries.FunnelAsync(http.Project().Id, query, cancellationToken), ApiJson.Default.FunnelResult));
+                : Results.Json(await queries.FunnelAsync(http.Project().Id, query, cancellationToken), ApiJson.Default.FunnelResult))
+            .WithName("FunnelQuery")
+            .Produces<FunnelResult>()
+            .ProducesValidationProblem();
 
         group.MapPost("/retention", async (RetentionQuery query, HttpContext http, AnalyticsQueries queries, CancellationToken cancellationToken) =>
             query.Problems() is { Count: > 0 } problems
                 ? Invalid(problems)
-                : Results.Json(await queries.RetentionAsync(http.Project().Id, query, cancellationToken), ApiJson.Default.RetentionResult));
+                : Results.Json(await queries.RetentionAsync(http.Project().Id, query, cancellationToken), ApiJson.Default.RetentionResult))
+            .WithName("RetentionQuery")
+            .Produces<RetentionResult>()
+            .ProducesValidationProblem();
 
         group.MapPost("/segment", async (SegmentQuery query, HttpContext http, AnalyticsQueries queries, CancellationToken cancellationToken) =>
             query.Problems() is { Count: > 0 } problems
                 ? Invalid(problems)
-                : Results.Json(await queries.SegmentAsync(http.Project().Id, query, cancellationToken), ApiJson.Default.SegmentResult));
+                : Results.Json(await queries.SegmentAsync(http.Project().Id, query, cancellationToken), ApiJson.Default.SegmentResult))
+            .WithName("SegmentQuery")
+            .Produces<SegmentResult>()
+            .ProducesValidationProblem();
 
         group.MapPost("/sessions", async (SessionsQuery query, HttpContext http, AnalyticsQueries queries, CancellationToken cancellationToken) =>
             query.Problems() is { Count: > 0 } problems
                 ? Invalid(problems)
-                : Results.Json(await queries.SessionsAsync(http.Project().Id, query, cancellationToken), ApiJson.Default.SessionsResult));
+                : Results.Json(await queries.SessionsAsync(http.Project().Id, query, cancellationToken), ApiJson.Default.SessionsResult))
+            .WithName("SessionsQuery")
+            .Produces<SessionsResult>()
+            .ProducesValidationProblem();
     }
 
     private static IResult Invalid(IReadOnlyList<string> problems) =>

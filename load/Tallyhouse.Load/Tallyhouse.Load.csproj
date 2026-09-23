@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The measurement harness: seeds the benchmark dataset, times queries, drives the ingest soak and runs the
+    counting proofs. Everything goes through the public HTTP API and ClickHouse's HTTP interface, so it
+    measures the system a client sees and depends on nothing inside it.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\seed.sql" LogicalName="seed.sql" />
+  </ItemGroup>
+
+</Project>

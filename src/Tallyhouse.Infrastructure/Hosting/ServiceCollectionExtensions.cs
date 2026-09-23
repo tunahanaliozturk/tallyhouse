@@ -1,3 +1,4 @@
+using System.Reflection;
 using ClickHouse.Driver;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -27,18 +28,19 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
         services.AddTallyhouseOptions(configuration);
 
-        string kafka = Required(configuration, "Kafka");
-        string postgres = Required(configuration, "Postgres");
+        // Connection strings are read when a service is first built, not here, so tooling that only builds the
+        // host (the OpenAPI document generator at build time) needs no infrastructure configured.
+        string Kafka() => Required(configuration, "Kafka");
 
         services.AddPooledDbContextFactory<CatalogDbContext>(options => options
-            .UseNpgsql(postgres)
+            .UseNpgsql(Required(configuration, "Postgres"))
             .UseSnakeCaseNamingConvention());
         services.AddSingleton<CatalogService>();
         services.AddSingleton<CatalogCache>();
         services.AddSingleton<ISchemaLookup>(sp => sp.GetRequiredService<CatalogCache>());
         services.AddSingleton<CatalogRefresher>();
 
-        services.AddSingleton(sp => new KafkaEventLog(kafka, sp.GetRequiredService<TallyhouseOptions>().Kafka, sp.GetRequiredService<ILogger<KafkaEventLog>>()));
+        services.AddSingleton(sp => new KafkaEventLog(Kafka(), sp.GetRequiredService<TallyhouseOptions>().Kafka, sp.GetRequiredService<ILogger<KafkaEventLog>>()));
         services.AddSingleton<IEventLog>(sp => sp.GetRequiredService<KafkaEventLog>());
         services.AddSingleton<KafkaHealth>();
 
@@ -68,8 +70,8 @@ public static class ServiceCollectionExtensions
             await using CatalogDbContext context = await sp.GetRequiredService<IDbContextFactory<CatalogDbContext>>().CreateDbContextAsync(ct);
             await context.Database.MigrateAsync(ct);
         });
-        services.AddStartupTask((sp, ct) => KafkaTopics.EnsureCreatedAsync(kafka, sp.GetRequiredService<TallyhouseOptions>().Kafka, ct));
-        services.AddHostedService(sp => sp.GetRequiredService<CatalogRefresher>());
+        services.AddStartupTask((sp, ct) => KafkaTopics.EnsureCreatedAsync(Kafka(), sp.GetRequiredService<TallyhouseOptions>().Kafka, ct));
+        services.AddBackgroundWork(sp => sp.GetRequiredService<CatalogRefresher>());
 
         return services;
     }
@@ -80,7 +82,7 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
         services.AddTallyhouseOptions(configuration);
 
-        string kafka = Required(configuration, "Kafka");
+        string Kafka() => Required(configuration, "Kafka");
 
         services.AddClickHouse(configuration);
         services.AddSingleton<ClickHouseMigrator>();
@@ -88,7 +90,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(sp =>
         {
             TallyhouseOptions options = sp.GetRequiredService<TallyhouseOptions>();
-            return new KafkaLoader(kafka, options.Kafka, options.Loader, sp.GetRequiredService<ClickHouseEventWriter>(),
+            return new KafkaLoader(Kafka(), options.Kafka, options.Loader, sp.GetRequiredService<ClickHouseEventWriter>(),
                 sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<KafkaLoader>>());
         });
         services.AddSingleton(sp => new Sessionizer(
@@ -98,9 +100,9 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<ILogger<Sessionizer>>()));
 
         services.AddStartupTask((sp, ct) => sp.GetRequiredService<ClickHouseMigrator>().MigrateAsync(ct));
-        services.AddStartupTask((sp, ct) => KafkaTopics.EnsureCreatedAsync(kafka, sp.GetRequiredService<TallyhouseOptions>().Kafka, ct));
-        services.AddHostedService(sp => sp.GetRequiredService<KafkaLoader>());
-        services.AddHostedService(sp => sp.GetRequiredService<Sessionizer>());
+        services.AddStartupTask((sp, ct) => KafkaTopics.EnsureCreatedAsync(Kafka(), sp.GetRequiredService<TallyhouseOptions>().Kafka, ct));
+        services.AddBackgroundWork(sp => sp.GetRequiredService<KafkaLoader>());
+        services.AddBackgroundWork(sp => sp.GetRequiredService<Sessionizer>());
 
         return services;
     }
@@ -115,15 +117,26 @@ public static class ServiceCollectionExtensions
 
     private static IServiceCollection AddClickHouse(this IServiceCollection services, IConfiguration configuration)
     {
-        string connectionString = Required(configuration, "ClickHouse");
-
         // Thread-safe and pools HTTP connections internally: one per process.
-        services.AddSingleton(_ => new ClickHouseClient(connectionString));
+        services.AddSingleton(_ => new ClickHouseClient(Required(configuration, "ClickHouse")));
         return services;
     }
 
     internal static IServiceCollection AddStartupTask(this IServiceCollection services, Func<IServiceProvider, CancellationToken, Task> task) =>
-        services.AddSingleton<IHostedService>(sp => new StartupTask(ct => task(sp, ct), sp.GetRequiredService<ILogger<StartupTask>>()));
+        IsBuildTimeTooling
+            ? services
+            : services.AddSingleton<IHostedService>(sp => new StartupTask(ct => task(sp, ct), sp.GetRequiredService<ILogger<StartupTask>>()));
+
+    private static IServiceCollection AddBackgroundWork<T>(this IServiceCollection services, Func<IServiceProvider, T> resolve)
+        where T : class, IHostedService =>
+        IsBuildTimeTooling ? services : services.AddHostedService(resolve);
+
+    /// <summary>
+    /// The OpenAPI document is produced at build time by a tool that starts the host to ask it for one. None of
+    /// the infrastructure exists then, so every service is registered (the document depends on knowing which
+    /// endpoint parameters are services) but nothing that talks to Kafka, Postgres or ClickHouse is started.
+    /// </summary>
+    private static bool IsBuildTimeTooling => Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider";
 
     private static ConfigurationOptions RedisOptions(string connectionString)
     {

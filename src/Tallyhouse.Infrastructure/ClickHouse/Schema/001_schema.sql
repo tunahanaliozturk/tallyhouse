@@ -34,35 +34,41 @@ SETTINGS ttl_only_drop_parts = 1,
          -- rather than waiting for a merge.
          non_replicated_deduplication_window = 1000;
 
--- The retention rollup: which users did which event on which day. It only ever holds a set, never a count,
--- and that is deliberate. A materialized view sees inserts, not merges, so a counting rollup would count
--- every duplicate the fact table has not merged away yet. A set is idempotent: inserting a member twice is
--- the same set.
-CREATE TABLE IF NOT EXISTS user_event_days
+-- The retention rollup: for each user, event and month, which days of the month they did it, as a 32-bit
+-- mask. It holds sets, never counts, and that is deliberate. A materialized view sees inserts, not merges,
+-- so a counting rollup would count every duplicate the fact table has not merged away yet. OR-ing a day's
+-- bit in twice is the same mask, so this one is right before, during and after merges.
+--
+-- It started as one row per user and day. On the 100-million-event benchmark that was 63 million rows, not
+-- much smaller than the fact table it summarises, because an active user touches most days; a month of
+-- days in one integer is 10 million. See docs/benchmark-results.
+CREATE TABLE IF NOT EXISTS user_event_months
 (
     project_id       UUID,
     event_name       LowCardinality(String),
-    day              Date,
+    month            Date,
     user_key         UInt64,
-    sample_threshold UInt16,
-    sample_bucket    UInt16
+    days             SimpleAggregateFunction(groupBitOr, UInt32),
+    sample_threshold SimpleAggregateFunction(min, UInt16),
+    sample_bucket    SimpleAggregateFunction(any, UInt16)
 )
-ENGINE = ReplacingMergeTree
-PARTITION BY toYYYYMM(day)
-ORDER BY (project_id, event_name, day, user_key)
-TTL day + INTERVAL 730 DAY;
+ENGINE = AggregatingMergeTree
+PARTITION BY toYYYYMM(month)
+ORDER BY (project_id, event_name, month, user_key)
+TTL month + INTERVAL 25 MONTH;
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS user_event_days_mv TO user_event_days AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS user_event_months_mv TO user_event_months AS
 SELECT
     project_id,
     event_name,
-    toDate(ts) AS day,
+    toStartOfMonth(ts) AS month,
     user_key,
+    groupBitOr(bitShiftLeft(toUInt32(1), toDayOfMonth(ts) - 1)) AS days,
     min(sample_threshold) AS sample_threshold,
     any(sample_bucket) AS sample_bucket
 FROM events
 WHERE NOT is_late
-GROUP BY project_id, event_name, day, user_key;
+GROUP BY project_id, event_name, month, user_key;
 
 -- Events that failed validation, with the reason, for somebody to fix and replay. A replay inserts the same
 -- key with a newer updated_at and status 'replayed'.

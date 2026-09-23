@@ -60,7 +60,10 @@ internal sealed record QuarantinePageResponse(IReadOnlyList<QuarantineItemRespon
         page.Next);
 }
 
-[JsonSourceGenerationOptions(JsonSerializerDefaults.Web, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+// Nulls are written, not omitted. The OpenAPI document describes a nullable field as present and null, and
+// the dashboard's types are generated from that document, so leaving the field out would make the server
+// disagree with its own contract.
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(IngestResponse))]
 [JsonSerializable(typeof(CreateProjectRequest))]
 [JsonSerializable(typeof(CreateProjectResponse))]

@@ -20,8 +20,19 @@ internal static class IngestEndpoints
     {
         RouteGroupBuilder group = app.MapGroup("/v1/events").RequireWriteKey().WithTags("Ingest");
 
-        group.MapPost("/", (Delegate)IngestOneAsync).WithMetadata(new RequestSizeLimitAttribute(MaxEventBytes));
-        group.MapPost("/batch", (Delegate)IngestBatchAsync).WithMetadata(new RequestSizeLimitAttribute(MaxBatchBytes));
+        group.MapPost("/", (Delegate)IngestOneAsync)
+            .WithName("IngestEvent")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEventBytes))
+            .Produces<IngestResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+
+        group.MapPost("/batch", (Delegate)IngestBatchAsync)
+            .WithName("IngestBatch")
+            .WithMetadata(new RequestSizeLimitAttribute(MaxBatchBytes))
+            .Produces<IngestResponse>(StatusCodes.Status202Accepted)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
     }
 
     private static async Task<IResult> IngestOneAsync(HttpContext http, IngestPipeline pipeline, CancellationToken cancellationToken)
