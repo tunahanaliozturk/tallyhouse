@@ -1,0 +1,134 @@
+# The whole pipeline on one machine: `docker compose up -d --build`, then follow the README quick start.
+#
+# The demo keys below are public, in this file, on purpose. They exist so the stack can be driven with curl
+# the moment it is up. Anything reachable from outside your machine needs its own keys and operator token.
+
+x-demo-keys: &demo
+  Tallyhouse__OperatorToken: demo-operator-token
+  Tallyhouse__Demo__ProjectId: 0199b6a0-0000-7000-8000-00000000d3e0
+  Tallyhouse__Demo__WriteKey: thw_demo_write_key_do_not_use_outside_localhost
+  Tallyhouse__Demo__ReadKey: thr_demo_read_key_do_not_use_outside_localhost
+
+x-connections: &connections
+  ConnectionStrings__Kafka: kafka:9092
+  ConnectionStrings__ClickHouse: Host=clickhouse;Port=8123;Username=tallyhouse;Password=tallyhouse;Database=tallyhouse
+  ConnectionStrings__Postgres: Host=postgres;Database=tallyhouse;Username=tallyhouse;Password=tallyhouse
+  ConnectionStrings__Redis: redis:6379
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: tallyhouse
+      POSTGRES_PASSWORD: tallyhouse
+      POSTGRES_DB: tallyhouse
+    volumes:
+      # Postgres 18 images keep data under a versioned directory and refuse a volume at .../data.
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tallyhouse"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  kafka:
+    image: apache/kafka:4.3.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,HOST://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Topics are created by the services with the partition count they need, never by accident.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "9094:9094"
+    volumes:
+      - kafka:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8-alpine
+    environment:
+      CLICKHOUSE_USER: tallyhouse
+      CLICKHOUSE_PASSWORD: tallyhouse
+      CLICKHOUSE_DB: tallyhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    ports:
+      - "8123:8123"
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -q Ok"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  loader:
+    build:
+      context: .
+      target: loader
+    environment:
+      <<: *connections
+    depends_on:
+      kafka:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "healthcheck", "/health/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      <<: [*connections, *demo]
+    ports:
+      - "5180:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      # The loader owns the ClickHouse schema; queries need it to exist.
+      loader:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "healthcheck", "/health/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+volumes:
+  postgres:
+  kafka:
+  clickhouse:

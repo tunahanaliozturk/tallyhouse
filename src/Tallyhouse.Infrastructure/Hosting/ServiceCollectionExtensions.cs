@@ -122,7 +122,7 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    private static IServiceCollection AddStartupTask(this IServiceCollection services, Func<IServiceProvider, CancellationToken, Task> task) =>
+    internal static IServiceCollection AddStartupTask(this IServiceCollection services, Func<IServiceProvider, CancellationToken, Task> task) =>
         services.AddSingleton<IHostedService>(sp => new StartupTask(ct => task(sp, ct), sp.GetRequiredService<ILogger<StartupTask>>()));
 
     private static ConfigurationOptions RedisOptions(string connectionString)

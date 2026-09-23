@@ -10,6 +10,7 @@ builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.T
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddTallyhouseCollector(builder.Configuration);
+builder.Services.AddTallyhouseDemo(builder.Configuration);
 builder.AddTallyhouseTelemetry("tallyhouse-api");
 
 WebApplication app = builder.Build();

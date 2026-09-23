@@ -27,6 +27,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Tallyhouse.UnitTests" />
     <InternalsVisibleTo Include="Tallyhouse.IntegrationTests" />
+    <InternalsVisibleTo Include="Tallyhouse.Benchmarks" />
   </ItemGroup>
 
 </Project>

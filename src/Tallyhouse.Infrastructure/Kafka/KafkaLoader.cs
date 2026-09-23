@@ -4,9 +4,9 @@ using System.Text.Json;
 using Confluent.Kafka;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Tallyhouse.Infrastructure.ClickHouse;
 using Tallyhouse.Kernel;
 using Tallyhouse.Kernel.Ingestion;
-using Tallyhouse.Infrastructure.ClickHouse;
 
 namespace Tallyhouse.Infrastructure.Kafka;
 

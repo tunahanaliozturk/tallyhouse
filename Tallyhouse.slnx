@@ -9,6 +9,9 @@
     <Project Path="tests/Tallyhouse.IntegrationTests/Tallyhouse.IntegrationTests.csproj" />
     <Project Path="tests/Tallyhouse.UnitTests/Tallyhouse.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Tallyhouse.Benchmarks/Tallyhouse.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/Tallyhouse.LicenseAudit/Tallyhouse.LicenseAudit.csproj" />
   </Folder>

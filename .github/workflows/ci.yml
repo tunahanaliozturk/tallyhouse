@@ -1,0 +1,133 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  build:
+    name: build and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Tallyhouse.slnx
+
+      - name: Build
+        run: dotnet build Tallyhouse.slnx --configuration Release --no-restore
+
+      # Whitespace and style only. Analyzer-level style is already enforced by EnforceCodeStyleInBuild with
+      # warnings as errors, so the full formatter would build a second workspace for no benefit.
+      - name: Verify formatting
+        run: |
+          dotnet format whitespace Tallyhouse.slnx --verify-no-changes --no-restore
+          dotnet format style Tallyhouse.slnx --verify-no-changes --no-restore
+
+      # Reads the licence of every package in the tree, at every depth, from the restored packages on disk.
+      # A dependency with a fee or a field-of-use restriction fails the build instead of arriving quietly.
+      - name: Audit dependency licences
+        run: dotnet run --project tools/Tallyhouse.LicenseAudit --configuration Release --no-build -- .
+
+      - name: Unit tests
+        run: dotnet run --project tests/Tallyhouse.UnitTests --configuration Release --no-build
+
+  integration:
+    name: integration suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Testcontainers starts Postgres, Redis, Kafka and ClickHouse against the runner's Docker daemon. The
+      # claims under test are Kafka acknowledgement, ClickHouse merge semantics and what survives pausing
+      # either of them, and a substitute would only prove the substitute was configured.
+      - name: Integration tests
+        run: dotnet run --project tests/Tallyhouse.IntegrationTests --configuration Release
+
+  compose:
+    name: docker compose demo
+    runs-on: ubuntu-latest
+    env:
+      WRITE: "Authorization: Bearer thw_demo_write_key_do_not_use_outside_localhost"
+      READ: "Authorization: Bearer thr_demo_read_key_do_not_use_outside_localhost"
+    steps:
+      - uses: actions/checkout@v5
+
+      # The quick start in the README is a promise. This runs it.
+      - name: Bring the stack up
+        run: docker compose up -d --build --wait --wait-timeout 300
+
+      - name: A key is required before anything else happens
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST localhost:5180/v1/events/batch \
+            -H 'content-type: application/json' -d '{"events":[]}')
+          test "$code" = "401"
+
+      - name: A batch is acknowledged, and an invalid event is quarantined rather than dropped
+        run: |
+          t() { date -u -d "$1" +%Y-%m-%dT%H:%M:%S.000Z; }
+          cat > batch.json <<JSON
+          {"events": [
+            {"messageId": "ci-1", "event": "page_view", "userId": "ada", "timestamp": "$(t '-3 min')", "properties": {"path": "/pricing"}},
+            {"messageId": "ci-2", "event": "signup", "userId": "ada", "timestamp": "$(t '-2 min')", "properties": {"plan": "pro"}},
+            {"messageId": "ci-3", "event": "purchase", "userId": "ada", "timestamp": "$(t '-1 min')", "properties": {"amount": 49, "currency": "EUR"}},
+            {"messageId": "ci-4", "event": "page_view", "userId": "bob", "timestamp": "$(t '-1 min')", "properties": {"path": "/", "utm": "x"}}
+          ]}
+          JSON
+          out=$(curl -sf -X POST localhost:5180/v1/events/batch -H "$WRITE" -H 'content-type: application/json' -d @batch.json)
+          echo "$out"
+          echo "$out" | jq -e '.accepted == 3 and .quarantined == 1' > /dev/null
+          echo "$out" | jq -e '.notAccepted[0].index == 3' > /dev/null
+
+      - name: The same batch again is recognised, not counted twice
+        run: |
+          out=$(curl -sf -X POST localhost:5180/v1/events/batch -H "$WRITE" -H 'content-type: application/json' -d @batch.json)
+          echo "$out" | jq -e '.accepted == 0 and .duplicates == 3' > /dev/null
+
+      - name: The loader delivers the events to ClickHouse and the funnel sees one conversion
+        run: |
+          today=$(date -u +%Y-%m-%d)
+          for i in $(seq 1 60); do
+            out=$(curl -sf -X POST localhost:5180/v1/queries/funnel -H "$READ" -H 'content-type: application/json' \
+              -d "{\"steps\":[\"page_view\",\"signup\",\"purchase\"],\"from\":\"$today\",\"to\":\"$today\",\"windowSeconds\":3600}" || true)
+            if echo "$out" | jq -e '.steps[2].users == 1' > /dev/null 2>&1; then echo "$out"; exit 0; fi
+            sleep 2
+          done
+          echo "$out"
+          docker compose logs --tail 80 loader
+          exit 1
+
+      # Quarantine travels on its own topic, so it can land a poll or two after the events.
+      - name: The quarantined event is listed with its reason
+        run: |
+          for i in $(seq 1 30); do
+            out=$(curl -sf localhost:5180/v1/quarantine -H "$READ" || true)
+            if echo "$out" | jq -e '.items | length >= 1' > /dev/null 2>&1; then
+              echo "$out" | jq -e '.items[0].reason | contains("utm")' > /dev/null
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
