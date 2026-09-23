@@ -4,7 +4,7 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Tallyhouse.Kernel;
+using Tallyhouse.Application;
 
 namespace Tallyhouse.Infrastructure.Hosting;
 

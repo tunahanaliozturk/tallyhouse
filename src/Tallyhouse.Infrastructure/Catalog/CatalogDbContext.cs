@@ -73,7 +73,7 @@ public sealed class ProjectEntity
 
     public required byte[] ReadKeyHash { get; set; }
 
-    /// <summary><see cref="Kernel.Projects.ProjectSettings"/> as JSON.</summary>
+    /// <summary><see cref="Domain.Projects.ProjectSettings"/> as JSON.</summary>
     public required string Settings { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
@@ -87,7 +87,7 @@ public sealed class EventSchemaEntity
 
     public int Version { get; set; }
 
-    /// <summary><see cref="Kernel.Schemas.SchemaSpec"/> as JSON.</summary>
+    /// <summary><see cref="Domain.Schemas.SchemaSpec"/> as JSON.</summary>
     public required string Spec { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }

@@ -4,7 +4,8 @@ using System.Text.Json;
 using ClickHouse.Driver.ADO.Parameters;
 using ClickHouse.Driver.ADO.Readers;
 using ClickHouse.Driver.Utility;
-using Tallyhouse.Kernel.Ingestion;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain.Events;
 
 namespace Tallyhouse.IntegrationTests;
 

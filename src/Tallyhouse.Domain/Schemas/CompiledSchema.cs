@@ -2,7 +2,7 @@ using System.Collections.Frozen;
 using System.Globalization;
 using System.Text.Json;
 
-namespace Tallyhouse.Kernel.Schemas;
+namespace Tallyhouse.Domain.Schemas;
 
 /// <summary>
 /// A schema turned into the shape the ingest path wants: a frozen lookup from property name to rule, and a

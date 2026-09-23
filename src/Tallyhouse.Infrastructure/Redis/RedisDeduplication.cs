@@ -1,8 +1,9 @@
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
-using Tallyhouse.Kernel;
-using Tallyhouse.Kernel.Ingestion;
+using Tallyhouse.Application;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain.Events;
 
 namespace Tallyhouse.Infrastructure.Redis;
 

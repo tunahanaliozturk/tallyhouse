@@ -6,7 +6,7 @@ using ClickHouse.Driver.ADO.Readers;
 using ClickHouse.Driver.Utility;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Tallyhouse.Kernel;
+using Tallyhouse.Application;
 
 namespace Tallyhouse.Infrastructure.ClickHouse;
 

@@ -1,9 +1,9 @@
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
-using Tallyhouse.Kernel.Schemas;
+using Tallyhouse.Domain.Schemas;
 
-namespace Tallyhouse.Kernel.Ingestion;
+namespace Tallyhouse.Application.Ingestion;
 
 /// <summary>
 /// The copy of a rejected event that quarantine keeps. It is the event as received, because the point of

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The use cases: taking a batch of events through normalisation, deduplication and the log, replaying a
+    quarantined one, and the queries a caller may ask with their bounds. What it needs from the outside world
+    it declares as ports (the log, the deduplication layer, the schema lookup), and Infrastructure implements
+    them. It references the domain and nothing else.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tallyhouse.Domain\Tallyhouse.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tallyhouse.UnitTests" />
+  </ItemGroup>
+
+</Project>

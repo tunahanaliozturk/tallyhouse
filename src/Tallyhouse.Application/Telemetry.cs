@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 
-namespace Tallyhouse.Kernel;
+namespace Tallyhouse.Application;
 
 /// <summary>
 /// One activity source and one meter for the whole pipeline, so a trace follows an event from the HTTP

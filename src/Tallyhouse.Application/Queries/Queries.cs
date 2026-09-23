@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Text.Json.Serialization;
-using Tallyhouse.Kernel.Ingestion;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain;
+using Tallyhouse.Domain.Events;
 
-namespace Tallyhouse.Kernel.Queries;
+namespace Tallyhouse.Application.Queries;
 
 /// <summary>
 /// What a caller may ask. Each query checks its own bounds here, before any SQL exists, so a request that

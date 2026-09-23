@@ -1,5 +1,5 @@
+using Tallyhouse.Application.Queries;
 using Tallyhouse.Infrastructure.ClickHouse.Queries;
-using Tallyhouse.Kernel.Queries;
 
 namespace Tallyhouse.Api.Endpoints;
 

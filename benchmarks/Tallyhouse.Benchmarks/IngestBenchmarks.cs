@@ -1,10 +1,11 @@
 using System.Text;
 using System.Text.Json;
 using BenchmarkDotNet.Attributes;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain.Events;
+using Tallyhouse.Domain.Projects;
+using Tallyhouse.Domain.Schemas;
 using Tallyhouse.Infrastructure.Kafka;
-using Tallyhouse.Kernel.Ingestion;
-using Tallyhouse.Kernel.Projects;
-using Tallyhouse.Kernel.Schemas;
 
 namespace Tallyhouse.Benchmarks;
 

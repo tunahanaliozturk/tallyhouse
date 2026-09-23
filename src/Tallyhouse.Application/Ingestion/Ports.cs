@@ -1,6 +1,7 @@
-using Tallyhouse.Kernel.Schemas;
+using Tallyhouse.Domain.Events;
+using Tallyhouse.Domain.Schemas;
 
-namespace Tallyhouse.Kernel.Ingestion;
+namespace Tallyhouse.Application.Ingestion;
 
 /// <summary>
 /// The durable buffer. Once <see cref="AppendAsync"/> returns, every record passed to it survives the loss of

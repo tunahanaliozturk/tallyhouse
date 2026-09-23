@@ -1,4 +1,4 @@
-namespace Tallyhouse.Kernel.Ingestion;
+namespace Tallyhouse.Domain.Events;
 
 /// <summary>
 /// Deterministic sampling by user. Every user falls in one of <see cref="Buckets"/> buckets derived from the

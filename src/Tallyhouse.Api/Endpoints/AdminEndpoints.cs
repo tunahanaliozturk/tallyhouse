@@ -1,10 +1,11 @@
 using System.Text.Json;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain;
+using Tallyhouse.Domain.Events;
+using Tallyhouse.Domain.Projects;
+using Tallyhouse.Domain.Schemas;
 using Tallyhouse.Infrastructure.Catalog;
 using Tallyhouse.Infrastructure.ClickHouse;
-using Tallyhouse.Kernel;
-using Tallyhouse.Kernel.Ingestion;
-using Tallyhouse.Kernel.Projects;
-using Tallyhouse.Kernel.Schemas;
 
 namespace Tallyhouse.Api.Endpoints;
 

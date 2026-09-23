@@ -1,6 +1,6 @@
+using Tallyhouse.Application;
 using Tallyhouse.Infrastructure.Hosting;
 using Tallyhouse.Infrastructure.Kafka;
-using Tallyhouse.Kernel;
 
 // The loader is a web host only so it can answer health probes and expose its lag. Everything it does
 // happens in the two hosted services: the Kafka-to-ClickHouse loader and the sessionizer.

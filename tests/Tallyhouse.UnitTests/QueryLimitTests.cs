@@ -1,4 +1,4 @@
-using Tallyhouse.Kernel.Queries;
+using Tallyhouse.Application.Queries;
 
 namespace Tallyhouse.UnitTests;
 

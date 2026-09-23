@@ -1,4 +1,4 @@
-namespace Tallyhouse.Kernel.Ingestion;
+namespace Tallyhouse.Domain.Events;
 
 public enum EventTiming
 {

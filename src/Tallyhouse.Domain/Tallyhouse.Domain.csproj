@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The rules of the problem: what a valid event and schema are, how a schema may evolve, when an event is
+    late, which users a sample keeps, who a user is. No I/O, no framework, and no reference to any other
+    project here, which the architecture test enforces.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Hashing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tallyhouse.UnitTests" />
+  </ItemGroup>
+
+</Project>

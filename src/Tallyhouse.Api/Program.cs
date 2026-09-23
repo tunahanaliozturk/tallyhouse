@@ -35,6 +35,3 @@ app.MapAdmin();
 app.MapQueries();
 
 await app.RunAsync();
-
-/// <summary>The entry point, visible to the integration suite's host factory.</summary>
-public partial class Program;

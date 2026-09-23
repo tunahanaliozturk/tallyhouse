@@ -1,5 +1,6 @@
 using ClickHouse.Driver;
-using Tallyhouse.Kernel.Ingestion;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain.Events;
 
 namespace Tallyhouse.Infrastructure.ClickHouse;
 

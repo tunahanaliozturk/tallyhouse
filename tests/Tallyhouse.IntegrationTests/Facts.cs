@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain.Events;
 using Tallyhouse.Infrastructure.ClickHouse;
-using Tallyhouse.Kernel.Ingestion;
 
 namespace Tallyhouse.IntegrationTests;
 

@@ -13,7 +13,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Tallyhouse.Kernel\Tallyhouse.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\Tallyhouse.Application\Tallyhouse.Application.csproj" />
+
+    <!-- Referenced so the architecture test can read what each layer really depends on. -->
+    <ProjectReference Include="..\..\src\Tallyhouse.Infrastructure\Tallyhouse.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Tallyhouse.Api\Tallyhouse.Api.csproj" />
+    <ProjectReference Include="..\..\src\Tallyhouse.Loader\Tallyhouse.Loader.csproj" />
   </ItemGroup>
 
 </Project>

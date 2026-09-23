@@ -1,4 +1,4 @@
-using Tallyhouse.Kernel.Schemas;
+using Tallyhouse.Domain.Schemas;
 
 namespace Tallyhouse.UnitTests;
 

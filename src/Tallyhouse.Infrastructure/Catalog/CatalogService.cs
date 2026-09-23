@@ -3,8 +3,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using Tallyhouse.Kernel.Projects;
-using Tallyhouse.Kernel.Schemas;
+using Tallyhouse.Domain.Projects;
+using Tallyhouse.Domain.Schemas;
 
 namespace Tallyhouse.Infrastructure.Catalog;
 

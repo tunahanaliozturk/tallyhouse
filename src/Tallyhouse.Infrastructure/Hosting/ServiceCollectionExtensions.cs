@@ -7,12 +7,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain.Events;
 using Tallyhouse.Infrastructure.Catalog;
 using Tallyhouse.Infrastructure.ClickHouse;
 using Tallyhouse.Infrastructure.ClickHouse.Queries;
 using Tallyhouse.Infrastructure.Kafka;
 using Tallyhouse.Infrastructure.Redis;
-using Tallyhouse.Kernel.Ingestion;
 
 namespace Tallyhouse.Infrastructure.Hosting;
 

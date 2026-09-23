@@ -1,6 +1,6 @@
+using Tallyhouse.Domain.Projects;
 using Tallyhouse.Infrastructure;
 using Tallyhouse.Infrastructure.Catalog;
-using Tallyhouse.Kernel.Projects;
 
 namespace Tallyhouse.Api;
 

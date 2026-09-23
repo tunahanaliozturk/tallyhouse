@@ -7,7 +7,8 @@ WORKDIR /source
 # layer. The .editorconfig comes along because analyzer severities live in it and the build treats warnings
 # as errors, so leaving it out makes the image build fail where a local build passes.
 COPY global.json .editorconfig Directory.Build.props Directory.Packages.props ./
-COPY src/Tallyhouse.Kernel/Tallyhouse.Kernel.csproj src/Tallyhouse.Kernel/
+COPY src/Tallyhouse.Domain/Tallyhouse.Domain.csproj src/Tallyhouse.Domain/
+COPY src/Tallyhouse.Application/Tallyhouse.Application.csproj src/Tallyhouse.Application/
 COPY src/Tallyhouse.Infrastructure/Tallyhouse.Infrastructure.csproj src/Tallyhouse.Infrastructure/
 COPY src/Tallyhouse.Api/Tallyhouse.Api.csproj src/Tallyhouse.Api/
 COPY src/Tallyhouse.Loader/Tallyhouse.Loader.csproj src/Tallyhouse.Loader/

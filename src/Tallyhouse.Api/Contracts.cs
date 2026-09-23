@@ -1,11 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Application.Queries;
+using Tallyhouse.Domain.Events;
+using Tallyhouse.Domain.Projects;
+using Tallyhouse.Domain.Schemas;
 using Tallyhouse.Infrastructure.ClickHouse;
-using Tallyhouse.Kernel.Ingestion;
-using Tallyhouse.Kernel.Projects;
-using Tallyhouse.Kernel.Queries;
-using Tallyhouse.Kernel.Schemas;
 
 namespace Tallyhouse.Api;
 

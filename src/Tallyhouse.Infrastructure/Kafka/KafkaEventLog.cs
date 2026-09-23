@@ -3,7 +3,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
-using Tallyhouse.Kernel.Ingestion;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain.Events;
 
 namespace Tallyhouse.Infrastructure.Kafka;
 

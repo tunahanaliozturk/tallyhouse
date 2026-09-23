@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
-namespace Tallyhouse.Kernel.Schemas;
+namespace Tallyhouse.Domain.Schemas;
 
 [JsonConverter(typeof(JsonStringEnumConverter<FieldType>))]
 [SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "These are the JSON type names a schema author writes, and they appear on the wire exactly as spelled.")]

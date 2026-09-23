@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Tallyhouse.Kernel/Tallyhouse.Kernel.csproj" />
+    <Project Path="src/Tallyhouse.Domain/Tallyhouse.Domain.csproj" />
+    <Project Path="src/Tallyhouse.Application/Tallyhouse.Application.csproj" />
     <Project Path="src/Tallyhouse.Infrastructure/Tallyhouse.Infrastructure.csproj" />
     <Project Path="src/Tallyhouse.Api/Tallyhouse.Api.csproj" />
     <Project Path="src/Tallyhouse.Loader/Tallyhouse.Loader.csproj" />

@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Tallyhouse.Domain.Projects;
+using Tallyhouse.Domain.Schemas;
 using Tallyhouse.Infrastructure.Catalog;
-using Tallyhouse.Kernel.Projects;
-using Tallyhouse.Kernel.Schemas;
 
 namespace Tallyhouse.Infrastructure.Hosting;
 

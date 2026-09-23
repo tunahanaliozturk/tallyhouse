@@ -1,7 +1,8 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Domain.Events;
 using Tallyhouse.Infrastructure;
-using Tallyhouse.Kernel.Ingestion;
 
 namespace Tallyhouse.Api.Endpoints;
 

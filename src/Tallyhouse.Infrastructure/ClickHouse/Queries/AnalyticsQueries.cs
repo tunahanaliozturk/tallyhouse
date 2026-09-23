@@ -6,9 +6,10 @@ using ClickHouse.Driver;
 using ClickHouse.Driver.ADO.Parameters;
 using ClickHouse.Driver.ADO.Readers;
 using ClickHouse.Driver.Utility;
-using Tallyhouse.Kernel;
-using Tallyhouse.Kernel.Ingestion;
-using Tallyhouse.Kernel.Queries;
+using Tallyhouse.Application;
+using Tallyhouse.Application.Ingestion;
+using Tallyhouse.Application.Queries;
+using Tallyhouse.Domain.Events;
 
 namespace Tallyhouse.Infrastructure.ClickHouse.Queries;
 
