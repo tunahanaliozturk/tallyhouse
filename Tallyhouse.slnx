@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Tallyhouse.Core/Tallyhouse.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tallyhouse.UnitTests/Tallyhouse.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Tallyhouse.LicenseAudit/Tallyhouse.LicenseAudit.csproj" />
+  </Folder>
+</Solution>

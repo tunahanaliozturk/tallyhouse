@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The rules of the pipeline: what a valid event is, when it is late, which users a sample keeps, and what
+    the ingest path does with each event. No I/O and no framework types beyond the BCL, so every rule can be
+    tested without a container and read without knowing Kafka or ClickHouse.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Hashing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tallyhouse.UnitTests" />
+  </ItemGroup>
+
+</Project>
