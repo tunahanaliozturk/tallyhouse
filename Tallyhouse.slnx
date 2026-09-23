@@ -2,8 +2,11 @@
   <Folder Name="/src/">
     <Project Path="src/Tallyhouse.Kernel/Tallyhouse.Kernel.csproj" />
     <Project Path="src/Tallyhouse.Infrastructure/Tallyhouse.Infrastructure.csproj" />
+    <Project Path="src/Tallyhouse.Api/Tallyhouse.Api.csproj" />
+    <Project Path="src/Tallyhouse.Loader/Tallyhouse.Loader.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Tallyhouse.IntegrationTests/Tallyhouse.IntegrationTests.csproj" />
     <Project Path="tests/Tallyhouse.UnitTests/Tallyhouse.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tools/">
