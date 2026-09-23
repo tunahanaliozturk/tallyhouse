@@ -128,6 +128,25 @@ services:
       retries: 40
     restart: unless-stopped
 
+  # The dashboard. nginx holds the demo project's read key and adds it to the read endpoints it proxies,
+  # so the browser never has one; ingest and operator endpoints are not reachable through it at all.
+  web:
+    build:
+      context: ./web
+    environment:
+      TALLYHOUSE_READ_KEY: thr_demo_read_key_do_not_use_outside_localhost
+    ports:
+      - "5181:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ > /dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
 volumes:
   postgres:
   kafka:

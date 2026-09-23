@@ -1,0 +1,41 @@
+# Queries scan real data, so each client gets a modest rate before anything reaches the API.
+limit_req_zone $binary_remote_addr zone=queries:10m rate=5r/s;
+
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    include /etc/nginx/mime.types;
+    limit_req_status 429;
+
+    # The dashboard is a read-only window onto one project. nginx holds the read key and adds it here, so
+    # no key is ever in the bundle or the browser, and only the read endpoints the dashboard uses are
+    # reachable through it: ingest and the operator endpoints are not, whatever the browser sends.
+    location ~ ^/v1/(queries/(funnel|retention|segment|sessions)|schemas|quarantine)$ {
+        include /etc/nginx/security-headers.conf;
+        limit_req zone=queries burst=20 nodelay;
+        proxy_pass http://api:8080;
+        proxy_set_header Authorization "Bearer ${TALLYHOUSE_READ_KEY}";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_read_timeout 60s;
+    }
+
+    location /v1/ {
+        return 404;
+    }
+
+    # Hashed assets never change under the same name.
+    location /assets/ {
+        include /etc/nginx/security-headers.conf;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # A single page application: any address the router owns arrives as the index.
+    location / {
+        include /etc/nginx/security-headers.conf;
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache";
+    }
+}

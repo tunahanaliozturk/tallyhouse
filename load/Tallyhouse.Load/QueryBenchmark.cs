@@ -62,7 +62,7 @@ internal static class QueryBenchmark
             """
             SELECT table, formatReadableSize(sum(data_compressed_bytes)) AS compressed, formatReadableSize(sum(data_uncompressed_bytes)) AS uncompressed,
                    round(sum(data_uncompressed_bytes) / sum(data_compressed_bytes), 1) AS ratio, sum(rows) AS rows
-            FROM system.parts WHERE active AND database = currentDatabase() AND table IN ('events', 'user_event_days')
+            FROM system.parts WHERE active AND database = currentDatabase() AND table IN ('events', 'user_event_months')
             GROUP BY table FORMAT PrettyCompactMonoBlock
             """));
 
@@ -82,6 +82,18 @@ internal static class QueryBenchmark
         using TallyhouseClient api = new(endpoints, connections: 4);
         using ClickHouseHttp clickHouse = new(endpoints);
 
+        // A bulk load leaves every day's partition in several overlapping parts, which is the worst case for
+        // FINAL and for the rollup. A live system reaches the settled state by background merges within
+        // minutes of a partition going quiet; --settle gets there now, so both states can be measured.
+        if (options.ContainsKey("settle"))
+        {
+            Stopwatch settling = Stopwatch.StartNew();
+            await clickHouse.QueryAsync("OPTIMIZE TABLE events FINAL SETTINGS max_execution_time = 0");
+            await clickHouse.QueryAsync("OPTIMIZE TABLE user_event_months FINAL SETTINGS max_execution_time = 0");
+            Console.WriteLine($"Merged in {settling.Elapsed.TotalSeconds:0} s.");
+        }
+
+        string parts = await clickHouse.QueryAsync("SELECT count() FROM system.parts WHERE active AND database = currentDatabase() AND table = 'events'");
         long rows = await clickHouse.CountAsync(project.Id);
 
         (string Name, string Kind, object Query)[] suite =
@@ -101,7 +113,7 @@ internal static class QueryBenchmark
         ];
 
         StringBuilder report = new();
-        report.AppendLine(CultureInfo.InvariantCulture, $"Dataset: {Stats.N(rows)} events, {days} days from {start:yyyy-MM-dd}. {runs} timed runs per query after {warmup} warm-up runs, one query at a time, measured by the client through the HTTP API.");
+        report.AppendLine(CultureInfo.InvariantCulture, $"Dataset: {Stats.N(rows)} events, {days} days from {start:yyyy-MM-dd}, in {parts} active parts. {runs} timed runs per query after {warmup} warm-up runs, one query at a time, measured by the client through the HTTP API.");
         report.AppendLine();
         report.AppendLine("| Query | p50 ms | p95 ms | p99 ms | max ms |");
         report.AppendLine("|---|---:|---:|---:|---:|");
@@ -138,7 +150,7 @@ internal static class QueryBenchmark
 
         foreach (JsonElement step in funnel.GetProperty("steps").EnumerateArray())
         {
-            string median = step.TryGetProperty("medianSecondsFromStart", out JsonElement seconds) ? TimeSpan.FromSeconds(seconds.GetDouble()).ToString(@"d\d\ hh\h\ mm\m", CultureInfo.InvariantCulture) : "";
+            string median = step.TryGetProperty("medianSecondsFromStart", out JsonElement seconds) && seconds.ValueKind == JsonValueKind.Number ? TimeSpan.FromSeconds(seconds.GetDouble()).ToString(@"d\d\ hh\h\ mm\m", CultureInfo.InvariantCulture) : "";
             report.AppendLine(CultureInfo.InvariantCulture, $"| {step.GetProperty("event").GetString()} | {Stats.N(step.GetProperty("users").GetInt64())} | {step.GetProperty("conversionFromPrevious").GetDouble():P1} | {median} |");
         }
 

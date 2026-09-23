@@ -62,6 +62,85 @@ jobs:
       - name: Integration tests
         run: dotnet run --project tests/Tallyhouse.IntegrationTests --configuration Release
 
+  benchmark-smoke:
+    name: benchmark smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # One dry iteration, only to catch a benchmark that no longer compiles or throws. A shared runner is
+      # far too noisy to back a nanosecond claim; published numbers come from known hardware.
+      - name: Benchmarks compile and run
+        run: dotnet run -c Release --project benchmarks/Tallyhouse.Benchmarks -- --filter "*" --job Dry
+
+  web:
+    name: dashboard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      # Vite does not type-check, so this is its own step. The response schemas are checked against types
+      # generated from the server's OpenAPI document here, which is where a contract change fails.
+      - run: npm run type-check
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      - run: npm run build
+
+      # What a first visit downloads, gzipped, against a fixed allowance.
+      - run: npm run budget
+
+      # The npm tree is held to the same licence policy as the NuGet one.
+      - run: npm run licences
+
+  contract:
+    name: api contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # The server writes its OpenAPI document at build time. If it differs from the committed copy, somebody
+      # changed the API without regenerating the dashboard's types, and the dashboard would find out at
+      # runtime. Here it finds out at review.
+      - name: Regenerate the OpenAPI document
+        run: dotnet build src/Tallyhouse.Api -p:OpenApiGenerateDocuments=true
+
+      - name: The committed document matches the server
+        run: git diff --exit-code web/openapi.json
+
+      - name: The dashboard's types match the document and still compile
+        working-directory: web
+        run: |
+          npm ci
+          npm run contract
+          git diff --exit-code src/api/schema.d.ts
+          npm run type-check
+
   compose:
     name: docker compose demo
     runs-on: ubuntu-latest
@@ -127,6 +206,23 @@ jobs:
             sleep 2
           done
           exit 1
+
+      # The dashboard against the same stack, through nginx, which holds the read key. The journeys check
+      # that it renders what the pipeline stored, and axe checks every screen for accessibility violations.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Dashboard journeys and accessibility
+        working-directory: web
+        env:
+          TALLYHOUSE_WEB_URL: http://127.0.0.1:5181
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test
 
       - name: Tear down
         if: always()

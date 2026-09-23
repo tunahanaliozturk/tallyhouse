@@ -1,0 +1,127 @@
+# Every endpoint, in the order a reader would try them, against the compose stack
+# (docker compose up -d --build). The keys below are the demo project's, which compose.yaml seeds; they are
+# public on purpose and only good on localhost.
+
+@api = http://localhost:5180
+@write = thw_demo_write_key_do_not_use_outside_localhost
+@read = thr_demo_read_key_do_not_use_outside_localhost
+@operator = demo-operator-token
+@demo = 0199b6a0-0000-7000-8000-00000000d3e0
+
+### Health. Ready means this collector has a catalog and can reach Kafka; ClickHouse is not part of it.
+GET {{api}}/health/ready
+
+### Send one event. 202 means it is in Kafka, not yet queryable. Replace the timestamp with a recent one:
+### events older than two hours are stored as late, and older than 90 days are quarantined.
+POST {{api}}/v1/events
+Authorization: Bearer {{write}}
+Content-Type: application/json
+
+{
+  "messageId": "http-file-1",
+  "event": "signup",
+  "userId": "ada",
+  "timestamp": "2026-09-23T12:00:00.000Z",
+  "properties": { "plan": "pro", "source": "newsletter" }
+}
+
+### Send it again. Same messageId: acknowledged, reported as a duplicate, stored once.
+POST {{api}}/v1/events
+Authorization: Bearer {{write}}
+Content-Type: application/json
+
+{
+  "messageId": "http-file-1",
+  "event": "signup",
+  "userId": "ada",
+  "timestamp": "2026-09-23T12:00:00.000Z",
+  "properties": { "plan": "pro", "source": "newsletter" }
+}
+
+### A batch of up to 500. The second event has a property its schema does not declare, so it is
+### quarantined; the first is accepted. The response lists every event that was not accepted, by index.
+POST {{api}}/v1/events/batch
+Authorization: Bearer {{write}}
+Content-Type: application/json
+
+{
+  "events": [
+    { "messageId": "http-file-2", "event": "activate", "userId": "ada", "timestamp": "2026-09-23T12:05:00.000Z" },
+    { "messageId": "http-file-3", "event": "page_view", "userId": "ada", "timestamp": "2026-09-23T12:06:00.000Z", "properties": { "path": "/", "utm": "spring" } }
+  ]
+}
+
+### The event types this project accepts.
+GET {{api}}/v1/schemas
+Authorization: Bearer {{read}}
+
+### What is waiting in quarantine, newest first, with the reason.
+GET {{api}}/v1/quarantine?limit=20
+Authorization: Bearer {{read}}
+
+### Grow the page_view schema so the quarantined event would be accepted. Adding an optional property is
+### allowed in place; removing one, changing a type or narrowing allowed values is refused with 409.
+PUT {{api}}/v1/projects/{{demo}}/schemas/page_view/versions/1
+Authorization: Bearer {{operator}}
+Content-Type: application/json
+
+{
+  "properties": {
+    "path": { "type": "string", "required": true },
+    "referrer": { "type": "string" },
+    "utm": { "type": "string" }
+  }
+}
+
+### Replay it. Take the id from the quarantine list above. Lateness is judged as of when it first arrived.
+POST {{api}}/v1/projects/{{demo}}/quarantine/00000000-0000-0000-0000-000000000000/replay
+Authorization: Bearer {{operator}}
+
+### A funnel: users who did every step in order within the window, with the median time to each step.
+POST {{api}}/v1/queries/funnel
+Authorization: Bearer {{read}}
+Content-Type: application/json
+
+{ "steps": ["signup", "activate", "purchase"], "from": "2026-09-01", "to": "2026-09-30", "windowSeconds": 604800 }
+
+### Retention: cohorts by the day of their first signup, and how many viewed a page each day after.
+POST {{api}}/v1/queries/retention
+Authorization: Bearer {{read}}
+Content-Type: application/json
+
+{ "startEvent": "signup", "returnEvent": "page_view", "from": "2026-09-01", "to": "2026-09-30", "days": 7 }
+
+### The same from the raw events instead of the rollup. The answer is identical; only the cost differs.
+POST {{api}}/v1/queries/retention
+Authorization: Bearer {{read}}
+Content-Type: application/json
+
+{ "startEvent": "signup", "returnEvent": "page_view", "from": "2026-09-01", "to": "2026-09-30", "days": 7, "source": "events" }
+
+### Daily counts with a property filter. Operators: eq, neq, in, gt, lt. Late events are reported apart.
+POST {{api}}/v1/queries/segment
+Authorization: Bearer {{read}}
+Content-Type: application/json
+
+{ "event": "purchase", "from": "2026-09-01", "to": "2026-09-30", "filters": [{ "property": "currency", "operator": "in", "values": ["EUR", "TRY"] }] }
+
+### Sessions per day: 30-minute inactivity gap, cut at midnight UTC.
+POST {{api}}/v1/queries/sessions
+Authorization: Bearer {{read}}
+Content-Type: application/json
+
+{ "from": "2026-09-01", "to": "2026-09-30" }
+
+### Create a project. The keys are shown once, here, and only their hashes are stored.
+POST {{api}}/v1/projects
+Authorization: Bearer {{operator}}
+Content-Type: application/json
+
+{ "name": "shop", "settings": { "redactProperties": ["email"], "sampleRates": { "page_view": 0.1 } } }
+
+### Change what a project redacts and samples.
+PUT {{api}}/v1/projects/{{demo}}/settings
+Authorization: Bearer {{operator}}
+Content-Type: application/json
+
+{ "redactProperties": ["email"], "sampleRates": {} }
