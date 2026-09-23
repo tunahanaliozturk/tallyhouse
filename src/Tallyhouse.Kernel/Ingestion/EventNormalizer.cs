@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Text.Json;
-using Tallyhouse.Core.Projects;
-using Tallyhouse.Core.Schemas;
+using Tallyhouse.Kernel.Projects;
+using Tallyhouse.Kernel.Schemas;
 
-namespace Tallyhouse.Core.Ingestion;
+namespace Tallyhouse.Kernel.Ingestion;
 
 /// <summary>
 /// Turns one untrusted event into exactly one of three things: a record to store, a sampled-out

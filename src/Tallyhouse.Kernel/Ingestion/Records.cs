@@ -1,4 +1,4 @@
-namespace Tallyhouse.Core.Ingestion;
+namespace Tallyhouse.Kernel.Ingestion;
 
 /// <summary>
 /// A validated, normalised event as it is written to the log and, from there, to the fact table. Nothing in

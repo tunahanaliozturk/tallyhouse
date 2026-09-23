@@ -1,4 +1,4 @@
-namespace Tallyhouse.Core.Schemas;
+namespace Tallyhouse.Kernel.Schemas;
 
 /// <summary>
 /// Decides whether a schema may be changed in place. The rule is the one that keeps every event already

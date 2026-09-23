@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Tallyhouse.Core\Tallyhouse.Core.csproj" />
+    <ProjectReference Include="..\..\src\Tallyhouse.Kernel\Tallyhouse.Kernel.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tallyhouse.Kernel\Tallyhouse.Kernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClickHouse.Driver" />
+    <PackageReference Include="Confluent.Kafka" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="StackExchange.Redis" />
+  </ItemGroup>
+
+  <!-- The ClickHouse schema ships inside the assembly, so a loader cannot start against a schema it was not built for. -->
+  <ItemGroup>
+    <EmbeddedResource Include="ClickHouse\Schema\*.sql" LogicalName="clickhouse/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tallyhouse.UnitTests" />
+    <InternalsVisibleTo Include="Tallyhouse.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

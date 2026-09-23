@@ -18,7 +18,9 @@
     <PackageVersion Include="Confluent.Kafka" Version="2.15.1" />
     <!-- The official ClickHouse driver (the continuation of ClickHouse.Client). RowBinary inserts over HTTP. -->
     <PackageVersion Include="ClickHouse.Driver" Version="1.4.0" />
-    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="StackExchange.Redis" Version="3.3.1" />
   </ItemGroup>
 

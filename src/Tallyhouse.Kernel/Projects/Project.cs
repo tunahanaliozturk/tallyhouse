@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
-using Tallyhouse.Core.Ingestion;
+using Tallyhouse.Kernel.Ingestion;
 
-namespace Tallyhouse.Core.Projects;
+namespace Tallyhouse.Kernel.Projects;
 
 /// <summary>
 /// A tenant. Everything stored, deduplicated or queried is scoped to one, and its settings decide what the

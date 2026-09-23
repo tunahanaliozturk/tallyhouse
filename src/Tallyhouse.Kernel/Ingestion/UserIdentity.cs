@@ -1,7 +1,7 @@
 using System.IO.Hashing;
 using System.Text;
 
-namespace Tallyhouse.Core.Ingestion;
+namespace Tallyhouse.Kernel.Ingestion;
 
 /// <summary>
 /// Every query groups by user, and grouping a hundred million rows by a 64-bit integer is several times

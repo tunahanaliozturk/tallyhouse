@@ -1,4 +1,4 @@
-namespace Tallyhouse.Core;
+namespace Tallyhouse.Kernel;
 
 /// <summary>
 /// What an identifier may look like. These run for every event on the ingest path, so they are plain loops

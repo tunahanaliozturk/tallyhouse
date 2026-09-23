@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Microsoft.Extensions.Time.Testing;
-using Tallyhouse.Core.Ingestion;
-using Tallyhouse.Core.Projects;
-using Tallyhouse.Core.Schemas;
+using Tallyhouse.Kernel.Ingestion;
+using Tallyhouse.Kernel.Projects;
+using Tallyhouse.Kernel.Schemas;
 
 namespace Tallyhouse.UnitTests;
 

@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Tallyhouse.Core.Projects;
+using Tallyhouse.Kernel.Projects;
 
-namespace Tallyhouse.Core.Ingestion;
+namespace Tallyhouse.Kernel.Ingestion;
 
 /// <summary>
 /// The ingest path: normalise every event, drop the duplicates the fast layer knows about, make the rest
