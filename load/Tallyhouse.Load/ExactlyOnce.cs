@@ -125,7 +125,8 @@ internal static class ExactlyOnce
         }
 
         Console.WriteLine();
-        Console.WriteLine($"Physical rows before merges: {physical:N0} (the duplicates that got past the collector are really there).");
+        Console.WriteLine($"{acknowledged - total:N0} duplicate deliveries got past the collector's Redis layer and into Kafka.");
+        Console.WriteLine($"{physical - stored:N0} of them were still physically in ClickHouse when counted; the rest had been collapsed on insert or merge. The queries are exact either way.");
         Console.WriteLine();
         Console.WriteLine("| Measure | Ground truth | Measured |");
         Console.WriteLine("|---|---:|---:|");

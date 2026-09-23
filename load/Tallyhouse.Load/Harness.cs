@@ -10,9 +10,11 @@ namespace Tallyhouse.Load;
 /// <summary>Where the stack is. Defaults match the compose file, so on a laptop no flags are needed.</summary>
 internal sealed record Endpoints(Uri Api, Uri ClickHouse, string ClickHouseUser, string ClickHousePassword, string ClickHouseDatabase, string OperatorToken)
 {
+    // 127.0.0.1, not localhost. On Windows, .NET resolves localhost to ::1 first, Docker Desktop publishes
+    // ports on IPv4, and the failed IPv6 attempt added about 40 ms to every request the soak measured.
     public static Endpoints FromEnvironment() => new(
-        new Uri(Environment.GetEnvironmentVariable("TALLYHOUSE_API") ?? "http://localhost:5180"),
-        new Uri(Environment.GetEnvironmentVariable("CLICKHOUSE_URL") ?? "http://localhost:8123"),
+        new Uri(Environment.GetEnvironmentVariable("TALLYHOUSE_API") ?? "http://127.0.0.1:5180"),
+        new Uri(Environment.GetEnvironmentVariable("CLICKHOUSE_URL") ?? "http://127.0.0.1:8123"),
         Environment.GetEnvironmentVariable("CLICKHOUSE_USER") ?? "tallyhouse",
         Environment.GetEnvironmentVariable("CLICKHOUSE_PASSWORD") ?? "tallyhouse",
         Environment.GetEnvironmentVariable("CLICKHOUSE_DATABASE") ?? "tallyhouse",

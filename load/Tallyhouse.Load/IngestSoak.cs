@@ -12,8 +12,9 @@ namespace Tallyhouse.Load;
 /// <para>Open loop: request i is due at i * (batch / rate) seconds whether or not earlier requests have
 /// answered, and its latency is measured from when it was due, not from when it was sent. A closed-loop
 /// client slows down when the server does and reports a flattering p99; this one does not.</para>
-/// <para>Windows timers tick every 15.6 ms, so requests leave in small bursts at that granularity rather than
-/// perfectly spaced. The rate over any second is exact.</para>
+/// <para>Requests are dispatched from a dedicated thread that spins until each one is due. Windows timers tick
+/// every 15.6 ms, and a timer-driven dispatcher sent requests up to that late, which the latency then
+/// included; spinning costs the generator one core and makes the schedule accurate to microseconds.</para>
 /// </remarks>
 internal static class IngestSoak
 {
@@ -41,53 +42,62 @@ internal static class IngestSoak
         List<Task> tasks = new((int)requests);
         Stopwatch clock = Stopwatch.StartNew();
 
-        for (long i = 0; i < requests; i++)
+        Thread dispatcher = new(() =>
         {
-            double due = i * interval;
-
-            while (clock.Elapsed.TotalSeconds < due)
+            for (long i = 0; i < requests; i++)
             {
-                await Task.Delay(1);
+                double due = i * interval;
+
+                while (clock.Elapsed.TotalSeconds < due)
+                {
+                    Thread.SpinWait(20);
+                }
+
+                long index = i;
+                tasks.Add(Task.Run(async () =>
+                {
+                    long current = Interlocked.Increment(ref inFlight);
+                    InterlockedMax(ref peakInFlight, current);
+
+                    Event[] events = new Event[batch];
+                    DateTimeOffset now = DateTimeOffset.UtcNow;
+
+                    for (int j = 0; j < batch; j++)
+                    {
+                        int user = Random.Shared.Next(users);
+                        events[j] = EventBatches.PageView($"soak-{index}-{j}", $"user-{user}", now, user + j);
+                    }
+
+                    try
+                    {
+                        Delivery delivery = await EventBatches.SendAsync(api.Http, project.WriteKey, events);
+
+                        if (delivery.Status == HttpStatusCode.Accepted)
+                        {
+                            Interlocked.Add(ref accepted, delivery.Accepted);
+                        }
+                        else
+                        {
+                            Interlocked.Increment(ref refused);
+                        }
+                    }
+                    catch (HttpRequestException)
+                    {
+                        Interlocked.Increment(ref failed);
+                    }
+
+                    latencies[index] = (clock.Elapsed.TotalSeconds - due) * 1000;
+                    Interlocked.Decrement(ref inFlight);
+                }));
             }
+        })
+        {
+            IsBackground = true,
+            Priority = ThreadPriority.AboveNormal,
+        };
 
-            long index = i;
-            tasks.Add(Task.Run(async () =>
-            {
-                long current = Interlocked.Increment(ref inFlight);
-                InterlockedMax(ref peakInFlight, current);
-
-                Event[] events = new Event[batch];
-                DateTimeOffset now = DateTimeOffset.UtcNow;
-
-                for (int j = 0; j < batch; j++)
-                {
-                    int user = Random.Shared.Next(users);
-                    events[j] = EventBatches.PageView($"soak-{index}-{j}", $"user-{user}", now, user + j);
-                }
-
-                try
-                {
-                    Delivery delivery = await EventBatches.SendAsync(api.Http, project.WriteKey, events);
-
-                    if (delivery.Status == HttpStatusCode.Accepted)
-                    {
-                        Interlocked.Add(ref accepted, delivery.Accepted);
-                    }
-                    else
-                    {
-                        Interlocked.Increment(ref refused);
-                    }
-                }
-                catch (HttpRequestException)
-                {
-                    Interlocked.Increment(ref failed);
-                }
-
-                latencies[index] = (clock.Elapsed.TotalSeconds - due) * 1000;
-                Interlocked.Decrement(ref inFlight);
-            }));
-        }
-
+        dispatcher.Start();
+        dispatcher.Join();
         await Task.WhenAll(tasks);
         double elapsed = clock.Elapsed.TotalSeconds;
 
