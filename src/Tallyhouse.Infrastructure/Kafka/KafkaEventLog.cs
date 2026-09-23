@@ -23,6 +23,7 @@ public sealed partial class KafkaEventLog : IEventLog, IDisposable
 {
     private readonly IProducer<byte[], byte[]> producer;
     private readonly KafkaOptions options;
+    private int disposed;
 
     public KafkaEventLog(string bootstrapServers, KafkaOptions options, ILogger<KafkaEventLog> logger)
     {
@@ -93,6 +94,12 @@ public sealed partial class KafkaEventLog : IEventLog, IDisposable
 
     public void Dispose()
     {
+        // The container disposes this once for each registration that hands it out.
+        if (Interlocked.Exchange(ref disposed, 1) == 1)
+        {
+            return;
+        }
+
         // Give in-flight deliveries a chance to finish on shutdown rather than failing requests that were
         // about to succeed.
         producer.Flush(TimeSpan.FromSeconds(5));

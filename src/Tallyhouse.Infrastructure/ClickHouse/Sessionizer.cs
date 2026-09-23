@@ -62,10 +62,13 @@ public sealed partial class Sessionizer(ClickHouseClient client, SessionOptions 
     /// <summary>Recomputes every day marked dirty since the last pass. Returns how many days it recomputed.</summary>
     public async Task<int> RunOnceAsync(CancellationToken cancellationToken)
     {
-        // The upper bound comes from the ClickHouse clock, the same clock that stamped the markers.
-        DateTime upTo = ((DateTime)(await client.ExecuteScalarAsync(
-            $"SELECT now64(3) - toIntervalMillisecond({(long)VisibilityMargin.TotalMilliseconds})",
-            cancellationToken: cancellationToken))).ToUniversalTime();
+        // The upper bound comes from the ClickHouse clock, the same clock that stamped the markers. It travels
+        // as Unix milliseconds: a zone-less DateTime64 comes back with an unspecified kind, and converting that
+        // "to UTC" on a machine that is not on UTC silently moves the cursor by the local offset.
+        long upToMs = Convert.ToInt64(await client.ExecuteScalarAsync(
+            $"SELECT toUnixTimestamp64Milli(now64(3)) - {(long)VisibilityMargin.TotalMilliseconds}",
+            cancellationToken: cancellationToken), CultureInfo.InvariantCulture);
+        DateTime upTo = DateTime.UnixEpoch.AddMilliseconds(upToMs);
 
         DateTime from = cursor ?? upTo - DirtyRetention;
 
