@@ -41,6 +41,11 @@ The first release: the collector, the loader, the queries and the dashboard, wit
   holds the read key.
 - Response schemas checked against types generated from the API's OpenAPI document.
 
+### Structure
+
+- Domain, Application and Infrastructure projects under two hosts, the collector and the loader, with the
+  dependency direction checked against the compiled assemblies by `ArchitectureTests`.
+
 ### Measurement
 
 - `load/Tallyhouse.Load`: 100-million-event seed and query timing, ingest soak, the exactly-once and

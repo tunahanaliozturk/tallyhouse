@@ -104,6 +104,9 @@ Wait, or run `OPTIMIZE TABLE events PARTITION <yyyymmdd> FINAL` for the affected
   with projects times retained days (ADR 0004).
 - A funnel headed by the highest-volume event scans all of it. Four steps starting at 77 million page views
   take seconds, not milliseconds (docs/benchmark-results).
+- On one machine with everything co-located, ingest at 20,000 events a second keeps a p99 under 25 ms for a
+  minute but not for ten, where it reached 90 ms with stalls of over a second
+  (docs/benchmark-results/ingest-soak.md). The cause is not yet isolated.
 - Retention follows at most 63 days, over a span of at most 256 days, because the per-user masks are 64 and
   256 bits wide.
 - Identity is `userId` or `anonymousId`; there is no alias step joining an anonymous history to a user who
